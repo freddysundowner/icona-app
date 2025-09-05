@@ -1,0 +1,84 @@
+name: tokshop
+description: Tokshop.Live.
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+version: 2.1.17+66
+
+environment:
+  sdk: ">=3.0.3 <4.0.0"
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  get: ^4.6.1
+  flutter_screenutil: ^5.3.1
+  pdf: ^3.11.1
+  ionicons: ^0.2.2
+  http: ^1.2.2
+  firebase_auth: ^5.3.1
+  cloud_firestore: ^5.4.4
+  cached_network_image: ^3.2.0
+  image_picker:
+  go_router: ^14.8.1
+  image_cropper: ^8.1.0
+  agora_rtc_engine: ^6.5.0
+  firebase_storage:
+  flutter_local_notifications: ^18.0.1
+  firebase_dynamic_links:
+  flutter_svg: ^2.0.2
+  permission_handler: ^11.3.1
+  animation_wrappers: ^3.0.0
+  flutter_stripe: ^11.1.0
+  video_player: ^2.4.4
+  chewie: ^1.3.3
+#  csc_picker: ^0.2.6
+  url_launcher: ^6.0.2
+  country_picker: ^2.0.27
+  google_sign_in: ^6.0.1
+  sign_in_with_apple: ^6.1.3
+  shared_preferences: ^2.0.15
+  flutter_rating_bar: ^4.0.1
+  shimmer: ^3.0.0
+  package_info_plus: ^8.0.2
+  intl: ^0.20.1
+  share_plus: ^10.1.1
+  carousel_slider: ^5.0.0
+  socket_io_client: ^2.0.0
+  intl_phone_field: ^3.2.0
+  csc_picker_plus: ^0.0.3
+  printing: ^5.12.0
+  wakelock_plus: ^1.2.10
+  firebase_messaging: ^15.2.4
+  webview_flutter: ^4.10.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+flutter:
+  uses-material-design: true
+  fonts:
+    - family: Circular
+      fonts:
+        - asset: assets/fonts/circular/CircularStd-Bold.otf
+          weight: 300
+        - asset: assets/fonts/circular/CircularStd-Light.otf
+          weight: 100
+        - asset: assets/fonts/circular/CircularStd-Black.otf
+        - asset: assets/fonts/circular/CircularStd-Medium.otf
+          weight: 200
+    - family: Silka
+      fonts:
+        - asset: assets/fonts/silka.ttf
+          weight: 300
+        - asset: assets/fonts/silka.ttf
+          weight: 100
+        - asset: assets/fonts/silka.ttf
+        - asset: assets/fonts/silka.ttf
+          weight: 200
+
+  assets:
+    - assets/
+    - assets/images/
+    - assets/icons/
+    - assets/fonts/
+    - assets/sounds/
