@@ -1,4 +1,4 @@
-var baseUrl = 'http://192.168.100.3:5000';
+var baseUrl = 'https://7a53a8fc35da.ngrok-free.app';
 var demo = true;
 var appName = "Icona";
 var currencySymbol = "\$";

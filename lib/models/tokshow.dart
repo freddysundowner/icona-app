@@ -16,6 +16,8 @@ class Tokshow {
     this.date,
     this.started,
     this.status,
+    this.hlsUrl,
+    this.egressId,
     this.id,
     this.owner,
     this.title,
@@ -48,6 +50,7 @@ class Tokshow {
   List<String>? invitedhostIds = [];
   List<UserModel>? viewers = [];
   ProductCategory? category;
+  String? egressId;
   bool? started;
   bool? status;
   String? repeat;
@@ -55,6 +58,7 @@ class Tokshow {
   String? thumbnail;
   int? activeTime;
   UserModel? owner;
+  String? hlsUrl = "";
   String? title = "";
   int? date = 0;
   String? recordingUid = "";
@@ -90,7 +94,9 @@ class Tokshow {
                   ? UserModel.fromJson(x)
                   : UserModel(id: x))),
       status: json["status"],
+      hlsUrl: json["hlsUrl"] ?? "",
       id: json["_id"] ?? "",
+      egressId: json["egressId"] ?? "",
       owner: json["owner"] == null
           ? null
           : json["owner"].toString().length > 40

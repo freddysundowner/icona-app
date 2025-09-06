@@ -234,4 +234,10 @@ class RoomAPI {
         .databaseRequest('$auction/$id', DbBase().deleteRequestType);
     return jsonDecode(updated);
   }
+
+  static getToken(Map<String, String?> map) async {
+    var updated = await DbBase()
+        .databaseRequest(livekitToken, DbBase().postRequestType, body: map);
+    return jsonDecode(updated);
+  }
 }

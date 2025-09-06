@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "167886286942",
+    "project_id": "icona-e7769",
+    "storage_bucket": "icona-e7769.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:167886286942:android:64c5f54b81acecd3e384cf",
+        "android_client_info": {
+          "package_name": "com.iconaapp.live"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "167886286942-j153ilutjlh25dpgjdssohvhod55sdif.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB7V_PVxllB9BUDZnlqrSvbs1HTZT1fg34"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "167886286942-j153ilutjlh25dpgjdssohvhod55sdif.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

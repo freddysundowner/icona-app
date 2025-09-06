@@ -129,14 +129,36 @@ class SocketController extends GetxController {
           Auction.fromJson(data);
       tokShowController.currentRoom.refresh();
     });
-    socket?.on('room-started', (data) async {
+
+    socket?.on("room-started", (data) async {
+      print("room started: $data");
+
       WakelockPlus.enable();
       tokShowController.currentRoom.value = Tokshow.fromJson(data);
-      await tokShowController.initAgora();
       tokShowController
           .checkDateGreaterthaNow(tokShowController.currentRoom.value);
       tokShowController.currentRoom.refresh();
+      // tokShowController.currentRoom.value?.hlsUrl = data["hlsUrl"] ?? "";
+      // tokShowController.currentRoom.refresh();
+      // // final startJson = jsonDecode(startRes.body);
+      //
+      // // setState(() {
+      // egressIds = [
+      //   if (startJson['hlsEgressId'] != null) startJson['hlsEgressId'],
+      //   if (startJson['recordEgressId'] != null) startJson['recordEgressId'],
+      // ];
+      // hlsUrl = startJson['hlsUrl']; // might be filled via webhook later
+      // // });
     });
+    // socket?.on('host-joined', (data) async {
+    //   print("host joined: $data");
+    //   WakelockPlus.enable();
+    //   tokShowController.currentRoom.value = Tokshow.fromJson(data);
+    //   await tokShowController.initLiveKit(data['credentials']);
+    //   tokShowController
+    //       .checkDateGreaterthaNow(tokShowController.currentRoom.value);
+    //   tokShowController.currentRoom.refresh();
+    // });
     socket?.on('left-room', (data) {
       WakelockPlus.disable();
       if (tokShowController.currentRoom.value != null) {
@@ -166,7 +188,7 @@ class SocketController extends GetxController {
     });
     socket?.on('room-ended', (data) {
       WakelockPlus.disable();
-      tokShowController.leaveAgoraEngine();
+      // tokShowController.leaveAgoraEngine();
       tokShowController.currentRoom.value?.activeauction = null;
       tokShowController.currentRoom.value?.ended = true;
       tokShowController.currentRoom.refresh();
@@ -185,7 +207,6 @@ class SocketController extends GetxController {
 
       auctionController.startTimerWithEndTime();
     });
-
     socket?.on('auction-time-extended', (data) {
       tokShowController.currentRoom.value?.activeauction?.endTime =
           data['newEndTime'] != null
@@ -213,12 +234,9 @@ class SocketController extends GetxController {
     });
   }
 
-  void endRoom() {
+  void endRoom(data) {
     if (!isConnected.value) return;
-    socket?.emit('end-room', {
-      "roomId": roomId,
-      "userId": userId,
-    });
+    socket?.emit('end-room', data);
   }
 
   void muteUser() {
@@ -339,12 +357,13 @@ class SocketController extends GetxController {
     super.onClose();
   }
 
-  void startShow() {
+  void hostJoin() {
     tokShowController.isReadyPreview.value = true;
-    socket?.emit('start-room', {
+    socket?.emit('host-join', {
       "roomId": roomId,
       "userId": userId,
       "userName": userName,
+      'role': 'host',
     });
   }
 
@@ -355,5 +374,10 @@ class SocketController extends GetxController {
       'showId': giveAway.room?.id,
       "userId": userId
     });
+  }
+
+  void startShow(data) async {
+    if (!isConnected.value) return;
+    socket?.emit('start-room', data);
   }
 }

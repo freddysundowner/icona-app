@@ -119,6 +119,8 @@ var stripePayout = "$baseUrl/stripe/payouts";
 var stripeBalance = "$baseUrl/stripe/balance";
 var striperansactions = "$baseUrl/stripe/transactions";
 
+var livekit = "$baseUrl/livekit";
+var livekitToken = "$livekit/token";
 var agora = "$baseUrl/stream/";
 var auction = "$baseUrl/auction/";
 var auctionbid = "$baseUrl/auction/bid";

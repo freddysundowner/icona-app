@@ -94,7 +94,7 @@ class LiveActions extends StatelessWidget {
             tokShowController.currentRoom.value?.started == true)
           InkWell(
             onTap: () async {
-              await tokShowController.engine?.switchCamera();
+              await tokShowController.switchCamera();
             },
             child: Column(
               children: [

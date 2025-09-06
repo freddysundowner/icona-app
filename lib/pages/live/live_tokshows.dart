@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +7,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:livekit_client/livekit_client.dart';
 import 'package:tokshop/controllers/auction_controller.dart';
 import 'package:tokshop/controllers/auth_controller.dart';
 import 'package:tokshop/controllers/checkout_controller.dart';
@@ -253,6 +253,10 @@ class _LiveShowPageState extends State<LiveShowPage>
 
   @override
   Widget build(BuildContext context) {
+    // return HlsVideoPlayer(
+    //   url:
+    //       "https://storage.googleapis.com/app-hls-streams/68bc03140e6c21c35f9594b4/mf84itvb/live.m3u8",
+    // );
     final bool isKeyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
     return PopScope(
       onPopInvokedWithResult: (b, v) {
@@ -531,7 +535,7 @@ class _LiveShowPageState extends State<LiveShowPage>
                                           context, "sure_want_to_start_show".tr,
                                           function: () {
                                         Get.back();
-                                        socketController.startShow();
+                                        _tokshowcontroller.getToken(context);
                                       });
                                     },
                                     backgroundColor: Colors.white,
@@ -684,28 +688,36 @@ class _LiveShowPageState extends State<LiveShowPage>
         color: Colors.white,
       ));
     }
-    if (_tokshowcontroller.engine == null) {
-      return SizedBox.shrink();
+    final room = _tokshowcontroller.lkRoom.value;
+    if (_tokshowcontroller.currentRoom.value!.owner?.id ==
+        authController.currentuser?.id) {
+      final local = room.localParticipant;
+      if (local != null && local.videoTrackPublications.isNotEmpty) {
+        final track = local.videoTrackPublications.first.track;
+        if (track is VideoTrack) {
+          return VideoTrackRenderer(
+            track as VideoTrack,
+            fit: VideoViewFit.cover,
+          );
+        }
+      }
+      return const Center(child: Text("Camera not started"));
     }
-    return Positioned.fill(
-        child: _tokshowcontroller.currentRoom.value!.owner?.id ==
-                authController.currentuser?.id
-            ? _videoView(AgoraVideoView(
-                controller: VideoViewController(
-                  rtcEngine: _tokshowcontroller.engine!,
-                  canvas: VideoCanvas(uid: 0),
-                ),
-              ))
-            : _videoView(AgoraVideoView(
-                controller: VideoViewController.remote(
-                  rtcEngine: _tokshowcontroller.engine!,
-                  canvas: VideoCanvas(
-                      uid: _tokshowcontroller
-                          .currentRoom.value!.owner?.agorauid!),
-                  connection: RtcConnection(
-                      channelId: _tokshowcontroller.currentRoom.value!.id!),
-                ),
-              )));
+    if (room.remoteParticipants.isNotEmpty) {
+      final remote = room.remoteParticipants.values.first;
+      if (remote.videoTrackPublications.isNotEmpty) {
+        final track = remote.videoTrackPublications.first.track;
+        if (track is VideoTrack) {
+          return VideoTrackRenderer(
+            track as VideoTrack,
+            fit: VideoViewFit.cover,
+          );
+        }
+      }
+      return const Center(child: Text("Waiting for host video..."));
+    }
+
+    return const Center(child: Text("No participants yet"));
   }
 
   pinnedProductWidget() {

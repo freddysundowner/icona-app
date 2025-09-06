@@ -1,14 +1,15 @@
 plugins {
     id("com.android.application")
     id("kotlin-android")
+    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
     id("com.google.gms.google-services")
 }
 
 android {
-    ndkVersion = "27.0.12077973"
     namespace = "com.iconaapp.live"
     compileSdk = flutter.compileSdkVersion
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
@@ -27,7 +28,6 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
-
     signingConfigs {
         create("release") {
             storeFile = rootProject.file(project.properties["KEYSTORE_PATH"].toString())
@@ -40,7 +40,7 @@ android {
     buildTypes {
         getByName("release") {
             signingConfig = signingConfigs.getByName("release")
-            isMinifyEnabled = true // Enable code shrinking/obfuscation (optional)
+            isMinifyEnabled = true // code shrinking
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -48,14 +48,12 @@ android {
         }
     }
 }
-
 dependencies {
-    // Add this line (critical for desugaring)
+    // Required for desugaring (Java 8+ APIs on lower Android versions)
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 
-    // ... other existing dependencies
+    // Other Flutter/Firebase deps are auto-added
 }
-
 flutter {
     source = "../.."
 }

@@ -1,12 +1,12 @@
 import 'dart:async';
 
-import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:chewie/chewie.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:tokshop/controllers/auction_controller.dart';
@@ -32,7 +32,6 @@ import 'chat_controller.dart';
 
 class TokShowController extends FullLifeCycleController
     with GetTickerProviderStateMixin {
-  RtcEngine? engine;
   FirebaseFirestore db = FirebaseFirestore.instance;
   RxList<Tokshow> mymanagedtokshows = RxList([]);
   RxList<Tokshow> mytokshows = RxList([]);
@@ -47,7 +46,7 @@ class TokShowController extends FullLifeCycleController
   var onTokShowChatPage = false.obs;
   var inAppProducts = [].obs;
   dynamic videoPlayerController;
-
+  final lkRoom = Room().obs;
   dynamic chewieController;
   var initializingRoom = false.obs;
   var isReadyPreview = false.obs;
@@ -132,16 +131,6 @@ class TokShowController extends FullLifeCycleController
   var hasMoreRooms = true.obs;
   var page = ''.obs;
 
-  void onResumed() async {
-    if (currentRoom.value!.id != null &&
-        currentRoom.value!.owner!.id ==
-            FirebaseAuth.instance.currentUser!.uid) {
-      engine?.muteLocalVideoStream(false);
-      engine?.enableLocalVideo(true);
-      engine?.enableVideo();
-    }
-  }
-
   dynamic headers;
   @override
   void onClose() {
@@ -220,140 +209,132 @@ class TokShowController extends FullLifeCycleController
     });
   }
 
-  Future<void> startRtmpStream() async {
-    await engine?.startRtmpStreamWithoutTranscoding(
-        "rtmp://a.rtmp.youtube.com/live2/ykfj-m892-g1t0-cfvs-8jtg");
-    // setState(() {
-    //   isStreaming = true;
-    // });
-  }
-
-  Future<void> initAgora() async {
-    print("🔄 Initializing Agora...");
-    initializingRoom.value = true;
-    try {
-      if (currentRoom.value!.owner?.id == authController.usermodel.value!.id) {
-        await [Permission.microphone, Permission.camera].request();
-      }
-
-      if (engine != null) {
-        initializingRoom.value = false;
-        print("⚠️ Agora engine already exists, cleaning up...");
-        // await leaveAgoraEngine();
-      } else {
-        initializingRoom.value = false;
-        engine = createAgoraRtcEngine();
-      }
-      await engine?.initialize(RtcEngineContext(
-        appId: agoraAppID.trim(),
-        channelProfile: ChannelProfileType.channelProfileLiveBroadcasting,
-      ));
-
-      print("✅ Agora Engine Initialized");
-
-      if (currentRoom.value!.owner?.id == authController.usermodel.value!.id) {
-        await engine?.startPreview();
-        await engine?.enableVideo();
-      } else {
-        await engine?.enableVideo();
-        await engine?.startPreview();
-      }
-      await engine?.enableAudio();
-      await engine?.setDefaultAudioRouteToSpeakerphone(true);
-      await engine?.setVideoEncoderConfiguration(
-        const VideoEncoderConfiguration(
-          dimensions: VideoDimensions(width: 640, height: 360),
-          frameRate: 30,
-          bitrate: 0,
-          orientationMode: OrientationMode.orientationModeFixedPortrait,
-        ),
-      );
-
-      print("✅ Video Preview Started");
-
-      // Set Role
-      if (currentRoom.value!.owner!.id == authController.usermodel.value!.id) {
-        await engine?.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
-        print("🎤 Role: Broadcaster");
-      } else {
-        await engine?.setClientRole(role: ClientRoleType.clientRoleAudience);
-        print("🎧 Role: Audience");
-      }
-
-      isReadyPreview.value = true;
-      await engine?.adjustRecordingSignalVolume(100);
-
-      // Register Event Handlers
-      engine?.registerEventHandler(
-        RtcEngineEventHandler(
-          onRtmpStreamingStateChanged: (String url,
-              RtmpStreamPublishState state, RtmpStreamPublishReason reason) {
-            print("RTMP Stream State: $state, Reason: $reason, URL: $url");
-
-            if (state == RtmpStreamPublishState.rtmpStreamPublishStateRunning) {
-              print("✅ RTMP stream is LIVE on YouTube!");
-            } else if (state ==
-                RtmpStreamPublishState.rtmpStreamPublishStateFailure) {
-              print("❌ RTMP streaming failed. Reason: $reason");
-            } else if (state ==
-                RtmpStreamPublishState.rtmpStreamPublishStateIdle) {
-              print("⚠️ RTMP stream is idle (no connection yet)");
-            }
-          },
-          onAudioVolumeIndication: (RtcConnection rtc,
-              List<AudioVolumeInfo> speakers, int totalVolume, int i) async {
-            for (var speaker in speakers) {
-              if (speaker.volume! > 20) {
-                writeToDbRoomActive();
-              }
-            }
-          },
-          onLocalAudioStats: (RtcConnection rtc, LocalAudioStats? stats) {},
-        ),
-      );
-
-      // Ensure UID is Valid
-      int agoraUid = authController.currentuser!.agorauid ?? 0;
-      print("📌 Agora UID: $agoraUid");
-
-      // Join Channel
-      await engine?.joinChannel(
-        token: currentRoom.value!.token,
-        channelId: currentRoom.value!.id!,
-        options: ChannelMediaOptions(
-          clientRoleType:
-              currentRoom.value!.owner!.id == authController.usermodel.value!.id
-                  ? ClientRoleType.clientRoleBroadcaster
-                  : ClientRoleType.clientRoleAudience,
-        ),
-        uid: agoraUid,
-      );
-
-      print("✅ Joined Agora Channel");
-
-      // Ensure Audio is Enabled
-      if (FirebaseAuth.instance.currentUser!.uid ==
-          currentRoom.value!.owner?.id!) {
-        await engine?.enableAudio();
-        await engine?.muteLocalAudioStream(false);
-      }
-      initializingRoom.value = false;
-
-      currentRoom.refresh();
-    } catch (e) {
-      initializingRoom.value = false;
-      print("❌ ERROR AGORA! $e");
-    } finally {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if ((authController.usermodel.value!.address == null ||
-                authController.usermodel.value!.defaultpaymentmethod == null) &&
-            checkOwner() == false) {
-          print("checkOwner() ${checkOwner()}");
-          showAlert(Get.context!);
-        }
-      });
-    }
-  }
+  // Future<void> initAgora() async {
+  //   print("🔄 Initializing Agora...");
+  //   initializingRoom.value = true;
+  //   try {
+  //     if (currentRoom.value!.owner?.id == authController.usermodel.value!.id) {
+  //       await [Permission.microphone, Permission.camera].request();
+  //     }
+  //
+  //     if (engine != null) {
+  //       initializingRoom.value = false;
+  //       print("⚠️ Agora engine already exists, cleaning up...");
+  //       // await leaveAgoraEngine();
+  //     } else {
+  //       initializingRoom.value = false;
+  //       engine = createAgoraRtcEngine();
+  //     }
+  //     await engine?.initialize(RtcEngineContext(
+  //       appId: agoraAppID.trim(),
+  //       channelProfile: ChannelProfileType.channelProfileLiveBroadcasting,
+  //     ));
+  //
+  //     print("✅ Agora Engine Initialized");
+  //
+  //     if (currentRoom.value!.owner?.id == authController.usermodel.value!.id) {
+  //       await engine?.startPreview();
+  //       await engine?.enableVideo();
+  //     } else {
+  //       await engine?.enableVideo();
+  //       await engine?.startPreview();
+  //     }
+  //     await engine?.enableAudio();
+  //     await engine?.setDefaultAudioRouteToSpeakerphone(true);
+  //     await engine?.setVideoEncoderConfiguration(
+  //       const VideoEncoderConfiguration(
+  //         dimensions: VideoDimensions(width: 640, height: 360),
+  //         frameRate: 30,
+  //         bitrate: 0,
+  //         orientationMode: OrientationMode.orientationModeFixedPortrait,
+  //       ),
+  //     );
+  //
+  //     print("✅ Video Preview Started");
+  //
+  //     // Set Role
+  //     if (currentRoom.value!.owner!.id == authController.usermodel.value!.id) {
+  //       await engine?.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
+  //       print("🎤 Role: Broadcaster");
+  //     } else {
+  //       await engine?.setClientRole(role: ClientRoleType.clientRoleAudience);
+  //       print("🎧 Role: Audience");
+  //     }
+  //
+  //     isReadyPreview.value = true;
+  //     await engine?.adjustRecordingSignalVolume(100);
+  //
+  //     // Register Event Handlers
+  //     engine?.registerEventHandler(
+  //       RtcEngineEventHandler(
+  //         onRtmpStreamingStateChanged: (String url,
+  //             RtmpStreamPublishState state, RtmpStreamPublishReason reason) {
+  //           print("RTMP Stream State: $state, Reason: $reason, URL: $url");
+  //
+  //           if (state == RtmpStreamPublishState.rtmpStreamPublishStateRunning) {
+  //             print("✅ RTMP stream is LIVE on YouTube!");
+  //           } else if (state ==
+  //               RtmpStreamPublishState.rtmpStreamPublishStateFailure) {
+  //             print("❌ RTMP streaming failed. Reason: $reason");
+  //           } else if (state ==
+  //               RtmpStreamPublishState.rtmpStreamPublishStateIdle) {
+  //             print("⚠️ RTMP stream is idle (no connection yet)");
+  //           }
+  //         },
+  //         onAudioVolumeIndication: (RtcConnection rtc,
+  //             List<AudioVolumeInfo> speakers, int totalVolume, int i) async {
+  //           for (var speaker in speakers) {
+  //             if (speaker.volume! > 20) {
+  //               writeToDbRoomActive();
+  //             }
+  //           }
+  //         },
+  //         onLocalAudioStats: (RtcConnection rtc, LocalAudioStats? stats) {},
+  //       ),
+  //     );
+  //
+  //     // Ensure UID is Valid
+  //     int agoraUid = authController.currentuser!.agorauid ?? 0;
+  //     print("📌 Agora UID: $agoraUid");
+  //
+  //     // Join Channel
+  //     await engine?.joinChannel(
+  //       token: currentRoom.value!.token,
+  //       channelId: currentRoom.value!.id!,
+  //       options: ChannelMediaOptions(
+  //         clientRoleType:
+  //             currentRoom.value!.owner!.id == authController.usermodel.value!.id
+  //                 ? ClientRoleType.clientRoleBroadcaster
+  //                 : ClientRoleType.clientRoleAudience,
+  //       ),
+  //       uid: agoraUid,
+  //     );
+  //
+  //     print("✅ Joined Agora Channel");
+  //
+  //     // Ensure Audio is Enabled
+  //     if (FirebaseAuth.instance.currentUser!.uid ==
+  //         currentRoom.value!.owner?.id!) {
+  //       await engine?.enableAudio();
+  //       await engine?.muteLocalAudioStream(false);
+  //     }
+  //     initializingRoom.value = false;
+  //
+  //     currentRoom.refresh();
+  //   } catch (e) {
+  //     initializingRoom.value = false;
+  //     print("❌ ERROR AGORA! $e");
+  //   } finally {
+  //     WidgetsBinding.instance.addPostFrameCallback((_) {
+  //       if ((authController.usermodel.value!.address == null ||
+  //               authController.usermodel.value!.defaultpaymentmethod == null) &&
+  //           checkOwner() == false) {
+  //         print("checkOwner() ${checkOwner()}");
+  //         showAlert(Get.context!);
+  //       }
+  //     });
+  //   }
+  // }
 
   Future<dynamic> wornUi(BuildContext context, UserModel userModel) async {
     // Show the bottom sheet
@@ -570,7 +551,7 @@ class TokShowController extends FullLifeCycleController
     _chatController.currentChatId.value = roomId;
     _chatController.singleRoomChatStream(roomId);
     if (checkDateGreaterthaNow(currentRoom.value!)) {
-      initAgora();
+      getToken(Get.context!);
     }
   }
 
@@ -605,14 +586,13 @@ class TokShowController extends FullLifeCycleController
       timer.value?.cancel();
       remainingTime.value = "Event Started";
     } else {
-      print("difference not ${difference.isNegative}");
       final int hours = difference.inHours;
       final int minutes = difference.inMinutes % 60;
       final int seconds = difference.inSeconds % 60;
       if (hours == 0 && minutes == 0 && seconds == 0) {
         timer.value?.cancel();
         currentRoom.value?.date = null;
-        Get.find<SocketController>().startShow();
+        // Get.find<SocketController>().startShow();
       }
       if (hours > 0) {
         remainingTime.value = "$hours h $minutes m $seconds s";
@@ -636,7 +616,7 @@ class TokShowController extends FullLifeCycleController
       } catch (e) {
         printOut("error removing stream");
       }
-      leaveAgoraEngine();
+      // leaveAgoraEngine();
     }
   }
 
@@ -647,9 +627,14 @@ class TokShowController extends FullLifeCycleController
       if (currentRoom.value!.activeauction != null) {
         auctionController.timer?.cancel();
       }
-      await leaveAgoraEngine();
+      // await leaveAgoraEngine();
+      lkRoom.value.disconnect();
       if (currentUser.id == tokshow.owner!.id) {
-        Get.put(SocketController()).endRoom();
+        Get.put(SocketController()).endRoom({
+          "roomId": tokshow.id,
+          "egressId": currentRoom.value?.egressId,
+          "userId": currentUser.id
+        });
         await RoomAPI().deleteARoom(tokshow.id!);
         getTokshows();
       } else {
@@ -669,20 +654,6 @@ class TokShowController extends FullLifeCycleController
       currentRoom.refresh();
     } finally {
       Get.off(() => HomeScreen());
-    }
-  }
-
-  Future<void> leaveAgoraEngine() async {
-    try {
-      if (engine != null) {
-        await engine?.leaveChannel();
-        await engine?.stopPreview();
-        await engine?.release(); // ✅ Fully clean up the Agora engine
-        engine = null; // ✅ Reset engine instance
-        print("left agora");
-      }
-    } catch (e) {
-      printOut("agoora error $e");
     }
   }
 
@@ -728,17 +699,13 @@ class TokShowController extends FullLifeCycleController
   }
 
   Future<void> muteUnMute(mute) async {
-    try {
-      audioMuted.value = !mute;
-      engine?.muteRemoteAudioStream(
-          uid: currentRoom.value!.owner!.agorauid!, mute: !mute);
-      if (checkOwner() == true) {
-        engine?.muteLocalAudioStream(!mute);
-      }
-      Get.find<SocketController>().muteUser();
-    } catch (e) {
-      printOut("error to speak $e");
-    }
+    bool? isCurrentlyEnabled =
+        lkRoom.value.localParticipant?.isMicrophoneEnabled();
+    await lkRoom.value.localParticipant
+        ?.setMicrophoneEnabled(!isCurrentlyEnabled!);
+    tokShowController.audioMuted.value = !isCurrentlyEnabled!;
+    RoomAPI().updateRoomById(
+        {"mute": tokShowController.audioMuted.value}, currentRoom.value!.id!);
   }
 
   Future<void> writeToDbRoomActive() async {
@@ -1177,6 +1144,87 @@ class TokShowController extends FullLifeCycleController
           category.followersCount == null ? 0 : category.followersCount! - 1;
       await ProductPI.unfollowCagory(
           Get.find<AuthController>().usermodel.value!.id!, category.id!);
+    }
+  }
+
+  Future<void> initLiveKit(Map<String, dynamic> tokenJson) async {
+    await [Permission.camera, Permission.microphone].request();
+
+    final room = lkRoom.value;
+    final connectOptions = ConnectOptions(
+      autoSubscribe: true, // Add this
+    );
+
+    // Listen for all participant events
+    room.events.listen((event) {
+      if (event is ParticipantConnectedEvent) {
+        print("Participant connected: ${event.participant.identity}");
+        lkRoom.refresh(); // This triggers Obx widgets to rebuild
+      }
+
+      if (event is ParticipantDisconnectedEvent) {
+        print("Participant disconnected: ${event.participant.identity}");
+        lkRoom.refresh();
+      }
+
+      if (event is TrackSubscribedEvent || event is TrackPublishedEvent) {
+        lkRoom.refresh(); // Update UI when tracks change
+      }
+    });
+    await room.connect(tokenJson['url'], tokenJson['token'],
+        connectOptions: connectOptions);
+    if (currentRoom.value?.owner?.id == authController.currentuser?.id) {
+      await room.localParticipant?.setCameraEnabled(true);
+      await room.localParticipant?.setMicrophoneEnabled(true);
+      Get.find<SocketController>().startShow({
+        "roomId": currentRoom.value?.id,
+        "userId": currentRoom.value?.owner?.id,
+      });
+    }
+  }
+
+  void getToken(BuildContext context) async {
+    try {
+      LoadingOverlay.showLoading(context);
+      var response = await RoomAPI.getToken({
+        "room": currentRoom.value?.id,
+        "userId": authController.currentuser?.id,
+        'role': currentRoom.value?.owner?.id == authController.currentuser?.id
+            ? 'host'
+            : 'audience',
+      });
+      LoadingOverlay.hideLoading(context);
+      if (response['token'] == null) {
+        GetSnackBar(
+          messageText: Text(
+            'error'.tr,
+            style: const TextStyle(color: Colors.white),
+          ),
+          backgroundColor: kPrimaryColor,
+        );
+        return;
+      }
+      initLiveKit(response);
+    } catch (e) {
+      print(e);
+    }
+  }
+
+  switchCamera() async {
+    // Option 1: Use getTrackPublications() and find camera track
+    LocalVideoTrack? videoTrack;
+
+    for (var publication
+        in lkRoom.value.localParticipant!.getTrackPublications()) {
+      if (publication.source == TrackSource.camera &&
+          publication.track is LocalVideoTrack) {
+        videoTrack = publication.track as LocalVideoTrack;
+        break;
+      }
+    }
+
+    if (videoTrack != null) {
+      await videoTrack.switchCamera('', fastSwitch: true);
     }
   }
 }
